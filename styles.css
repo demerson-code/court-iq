@@ -368,59 +368,65 @@ main {
 }
 .btn-delete-player:hover { background: #FEE2E2; }
 
-/* ===== Skill Slider Row ===== */
-.skill-row {
+/* ===== Skill Number Grid ===== */
+.skill-grid {
   display: grid;
-  grid-template-columns: 90px 1fr 32px;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  padding: 4px 0;
+}
+.skill-cell {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 6px 0;
+  gap: 4px;
+  min-width: 0;
 }
-.skill-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  text-transform: capitalize;
-}
-.skill-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 6px;
-  background: var(--border);
-  border-radius: 3px;
-  outline: none;
-  cursor: pointer;
-}
-.skill-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 22px;
-  height: 22px;
-  background: var(--pink);
-  border-radius: 50%;
-  cursor: pointer;
-  border: 3px solid white;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-}
-.skill-slider::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  background: var(--pink);
-  border-radius: 50%;
-  cursor: pointer;
-  border: 3px solid white;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-}
-.skill-value {
+.skill-cell-label {
+  font-size: 10px;
   font-weight: 700;
-  font-size: 14px;
-  color: var(--pink-dark);
+  color: var(--text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   text-align: center;
-  min-width: 24px;
+  white-space: nowrap;
+}
+.skill-cell-input {
+  width: 100%;
+  height: 38px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
   background: var(--pink-soft);
-  padding: 2px 6px;
-  border-radius: 6px;
+  color: var(--pink-dark);
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  padding: 0 2px;
+  font-family: inherit;
+  appearance: textfield;
+  -moz-appearance: textfield;
+  transition: border-color 0.15s, background 0.15s, transform 0.05s;
+}
+.skill-cell-input::-webkit-outer-spin-button,
+.skill-cell-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.skill-cell-input:focus {
+  outline: none;
+  border-color: var(--pink);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(255, 77, 139, 0.15);
+}
+.skill-cell-input:hover { border-color: var(--pink-light); }
+
+/* On very narrow screens, wrap to 4 columns */
+@media (max-width: 380px) {
+  .skill-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .skill-cell-label { font-size: 11px; }
 }
 
 /* ===== Weights ===== */

@@ -14,6 +14,15 @@ const SKILL_LABELS = {
   attitude: 'Attitude',
   communication: 'Comm.'
 };
+const SKILL_LABELS_SHORT = {
+  setting: 'Set',
+  passing: 'Pass',
+  serving: 'Serve',
+  spiking: 'Spike',
+  defense: 'Def',
+  attitude: 'Att',
+  communication: 'Comm'
+};
 
 // Position multipliers — how much each skill matters at each court position.
 // Position 1 = right back (server), 2 = right front (sets), 3 = mid front,
@@ -410,12 +419,10 @@ function buildPlayerCard(p) {
 
   // Skills section
   const skillBox = el('div', { cls: 'player-skills' });
-  SKILLS.forEach(skill => {
-    skillBox.appendChild(buildSkillRow(p.skills, skill, val => {
-      overallNum.textContent = avgSkillDisplay(p);
-      save();
-    }));
-  });
+  skillBox.appendChild(buildSkillGrid(p.skills, () => {
+    overallNum.textContent = avgSkillDisplay(p);
+    save();
+  }));
   const delBtn = el('button', {
     cls: 'btn-delete-player',
     text: '🗑 Delete player',
@@ -433,29 +440,63 @@ function avgSkillDisplay(p) {
   return (sum / SKILLS.length).toFixed(1);
 }
 
-function buildSkillRow(skillsObj, skill, onChange) {
-  const label = el('label', { cls: 'skill-label', text: SKILL_LABELS[skill] });
-  const slider = el('input', {
-    cls: 'skill-slider',
-    attrs: { type: 'range', min: '1', max: '10', step: '1' }
+function buildSkillGrid(skillsObj, onChange) {
+  const grid = el('div', { cls: 'skill-grid' });
+  SKILLS.forEach(skill => {
+    grid.appendChild(buildSkillCell(skillsObj, skill, onChange));
   });
-  slider.value = String(skillsObj[skill] || 5);
-  const val = el('span', { cls: 'skill-value', text: slider.value });
-  slider.addEventListener('input', e => {
-    skillsObj[skill] = +e.target.value;
-    val.textContent = e.target.value;
-    if (onChange) onChange(+e.target.value);
+  return grid;
+}
+
+function buildSkillCell(skillsObj, skill, onChange) {
+  const label = el('span', { cls: 'skill-cell-label', text: SKILL_LABELS_SHORT[skill] });
+  const input = el('input', {
+    cls: 'skill-cell-input',
+    attrs: {
+      type: 'number',
+      min: '1',
+      max: '10',
+      step: '1',
+      inputmode: 'numeric',
+      pattern: '[0-9]*'
+    }
   });
-  return el('div', { cls: 'skill-row' }, [label, slider, val]);
+  input.value = String(skillsObj[skill] || 5);
+
+  function commit(rawValue, finalize) {
+    let v = parseInt(rawValue, 10);
+    if (isNaN(v)) {
+      // While typing, allow empty input briefly. Only clamp on blur.
+      if (finalize) {
+        v = skillsObj[skill] || 5;
+        input.value = String(v);
+      }
+      return;
+    }
+    v = Math.max(1, Math.min(10, v));
+    if (finalize) input.value = String(v);
+    skillsObj[skill] = v;
+    if (onChange) onChange(v);
+  }
+  input.addEventListener('input', e => commit(e.target.value, false));
+  input.addEventListener('blur', e => commit(e.target.value, true));
+  // Select-all on focus so coaches can quickly retype
+  input.addEventListener('focus', e => e.target.select());
+  // Up/down arrow keys nudge by 1, clamped
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.target.blur(); }
+  });
+  // Stop card click handler from collapsing when tapping the input
+  input.addEventListener('click', e => e.stopPropagation());
+
+  return el('div', { cls: 'skill-cell' }, [label, input]);
 }
 
 /* ===== Weights ===== */
 function renderWeights() {
   const list = $('#weightList');
   list.replaceChildren();
-  SKILLS.forEach(skill => {
-    list.appendChild(buildSkillRow(S.weights, skill, () => save()));
-  });
+  list.appendChild(buildSkillGrid(S.weights, () => save()));
 }
 
 function updateCounts() {
