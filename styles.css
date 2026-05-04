@@ -1063,6 +1063,101 @@ body.swap-mode .player-circle.swap-source {
   transition: background 0.15s;
 }
 .btn-sub-in:hover { background: var(--pink-light); color: white; background: var(--pink); }
+
+/* ===== Drag & Drop ===== */
+.player-circle, .bench-list li {
+  touch-action: none;
+}
+.bench-list li { cursor: grab; }
+.bench-list li:active { cursor: grabbing; }
+.player-circle { cursor: grab; }
+.player-circle:active { cursor: grabbing; }
+
+body.dragging {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grabbing !important;
+}
+body.dragging .player-circle { cursor: grabbing; }
+
+.drag-source {
+  opacity: 0.35 !important;
+  filter: grayscale(0.5);
+}
+
+.drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  width: 88px;
+  height: 88px;
+  background: white;
+  border: 3px solid var(--pink);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+  transform: translate(-50%, -50%) scale(1);
+  animation: ghostIn 0.15s ease-out;
+  padding: 6px;
+  text-align: center;
+  line-height: 1.05;
+  overflow: hidden;
+}
+.drag-ghost .pname {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+@keyframes ghostIn {
+  from { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+  to   { transform: translate(-50%, -50%) scale(1); opacity: 0.92; }
+}
+
+.drop-target-active {
+  border-color: var(--good) !important;
+  border-width: 4px !important;
+  box-shadow: 0 0 0 6px rgba(16,185,129,0.25), 0 4px 14px rgba(16,185,129,0.4) !important;
+  transform: scale(1.07);
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+
+/* Bench drop zone — appears as a sticky bar at the bottom while dragging
+   a court player, so it's always reachable regardless of scroll. */
+.bench-drop-zone {
+  display: none;
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+  border: 2px dashed var(--pink);
+  border-radius: var(--radius);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pink-dark);
+  background: rgba(255, 240, 245, 0.97);
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+  z-index: 90;
+  pointer-events: auto;
+}
+body.dragging-court .bench-drop-zone { display: block; }
+.bench-drop-zone.drop-target-active {
+  border-color: var(--good);
+  background: rgba(16,185,129,0.18);
+  color: var(--good);
+  transform: scale(1.02);
+  border-style: solid;
+  box-shadow: 0 -4px 16px rgba(16,185,129,0.3);
+}
 .modal-content {
   background: var(--card);
   border-radius: var(--radius);

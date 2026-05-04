@@ -579,6 +579,173 @@ function resetToOptimal() {
   toast('Reset to optimal lineup.');
 }
 
+/* ===== Drag & Drop ===== */
+let dragState = null;
+
+function onDragStart(opts, e) {
+  // opts: { kind: 'court'|'bench', playerId, courtIdx? }
+  if (S.swapMode) return;            // swap mode pre-empts drag
+  if (e.button != null && e.button !== 0) return;  // left click only
+
+  // Don't start a drag if user pressed on a button inside the source
+  if (e.target.closest('button')) return;
+
+  dragState = {
+    ...opts,
+    pointerId: e.pointerId,
+    startX: e.clientX,
+    startY: e.clientY,
+    didMove: false,
+    ghost: null,
+    sourceEl: e.currentTarget
+  };
+  // Capture so move/up arrive even if pointer leaves the source
+  try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+}
+
+function onDragMove(e) {
+  if (!dragState || e.pointerId !== dragState.pointerId) return;
+  const dx = e.clientX - dragState.startX;
+  const dy = e.clientY - dragState.startY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  if (!dragState.didMove && dist > 8) {
+    dragState.didMove = true;
+    document.body.classList.add('dragging');
+    if (dragState.kind === 'court') document.body.classList.add('dragging-court');
+    dragState.sourceEl?.classList.add('drag-source');
+    dragState.ghost = makeGhost(dragState);
+    document.body.appendChild(dragState.ghost);
+  }
+  if (dragState.didMove) {
+    moveGhost(dragState.ghost, e.clientX, e.clientY);
+    updateDropHighlight(e.clientX, e.clientY, dragState);
+    e.preventDefault?.();
+  }
+}
+
+function onDragEnd(e) {
+  if (!dragState || e.pointerId !== dragState.pointerId) return;
+  const ds = dragState;
+  dragState = null;
+  if (ds.didMove) {
+    // Find target BEFORE removing dragging classes — otherwise the bench
+    // drop zone (display:none unless body.dragging-court) would vanish first.
+    let target = null;
+    if (e.type !== 'pointercancel') {
+      target = findDropTarget(e.clientX, e.clientY);
+    }
+    document.body.classList.remove('dragging');
+    document.body.classList.remove('dragging-court');
+    ds.sourceEl?.classList.remove('drag-source');
+    if (ds.ghost) ds.ghost.remove();
+    clearDropHighlight();
+    if (target) performDrop(ds, target);
+  }
+}
+
+function makeGhost(state) {
+  const ghost = document.createElement('div');
+  ghost.className = 'drag-ghost';
+  let player;
+  if (state.kind === 'court') {
+    player = S.result.starting6.find(p => p.id === state.playerId);
+  } else {
+    player = S.result.benchPool.find(p => p.id === state.playerId);
+  }
+  if (!player) return ghost;
+  const firstName = (player.name || '?').split(' ')[0];
+  ghost.appendChild(el('span', { cls: 'pname', text: firstName }));
+  return ghost;
+}
+
+function moveGhost(ghost, x, y) {
+  if (!ghost) return;
+  ghost.style.left = x + 'px';
+  ghost.style.top = y + 'px';
+}
+
+function findDropTarget(x, y) {
+  // Returns: { kind: 'court', courtIdx } | { kind: 'bench' } | null
+  const els = document.elementsFromPoint(x, y);
+  for (const e of els) {
+    if (e.classList?.contains('player-circle')) {
+      const playerId = e.dataset.playerId;
+      const idx = startingIdxOfPlayer(playerId);
+      if (idx >= 0) return { kind: 'court', courtIdx: idx, el: e };
+    }
+    if (e.id === 'benchDropZone' || e.id === 'benchCard' || e.id === 'benchList' || e.classList?.contains('bench-list')) {
+      return { kind: 'bench', el: document.getElementById('benchDropZone') };
+    }
+    if (e.tagName === 'LI' && e.parentElement?.id === 'benchList') {
+      return { kind: 'bench', el: document.getElementById('benchDropZone') };
+    }
+  }
+  return null;
+}
+
+let lastHighlight = null;
+function updateDropHighlight(x, y, ds) {
+  const target = findDropTarget(x, y);
+  if (lastHighlight && lastHighlight !== target?.el) {
+    lastHighlight.classList.remove('drop-target-active');
+  }
+  if (target?.el) {
+    // Don't highlight if dropping there is a no-op
+    if (ds.kind === 'court' && target.kind === 'court' && target.courtIdx === ds.courtIdx) {
+      lastHighlight = null;
+      return;
+    }
+    if (ds.kind === 'bench' && target.kind === 'bench') {
+      lastHighlight = null;
+      return;
+    }
+    target.el.classList.add('drop-target-active');
+    lastHighlight = target.el;
+  } else {
+    lastHighlight = null;
+  }
+}
+function clearDropHighlight() {
+  document.querySelectorAll('.drop-target-active').forEach(e => e.classList.remove('drop-target-active'));
+  lastHighlight = null;
+}
+
+function performDrop(source, target) {
+  if (!S.result) return;
+
+  // court → court: swap
+  if (source.kind === 'court' && target.kind === 'court') {
+    if (source.courtIdx === target.courtIdx) return;
+    swapTwoOnCourt(source.courtIdx, target.courtIdx);
+    renderLineup();
+    toast('Swapped.');
+    return;
+  }
+  // bench → court: sub in
+  if (source.kind === 'bench' && target.kind === 'court') {
+    subInBenchPlayer(source.playerId, target.courtIdx);
+    renderLineup();
+    toast('Subbed in.');
+    return;
+  }
+  // court → bench: send to bench, best bench auto-replaces
+  if (source.kind === 'court' && target.kind === 'bench') {
+    if (!S.result.bench.length) {
+      toast('No bench player available.');
+      return;
+    }
+    const incoming = S.result.bench[0].player;
+    S.result.starting6[source.courtIdx] = incoming;
+    rebuildDerivedFields(S.result);
+    markModifiedIfChanged();
+    renderLineup();
+    toast(`${incoming.name?.split(' ')[0] || 'Sub'} subbed in.`);
+    return;
+  }
+  // bench → bench: no-op
+}
+
 /* ===== Roster Render ===== */
 function renderRoster() {
   const list = $('#playerList');
@@ -779,11 +946,16 @@ function renderCourt() {
     if (S.swapMode?.kind === 'court' && S.result.starting6[S.swapMode.idx]?.id === player.id) {
       cls.push('swap-source');
     }
+    const courtIdx = startingIdxOfPlayer(player.id);
     const circle = el('div', {
       cls: cls.join(' '),
       dataset: { pos: String(pos), playerId: player.id },
       on: {
+        pointerdown: e => {
+          onDragStart({ kind: 'court', playerId: player.id, courtIdx }, e);
+        },
         click: e => {
+          // Click won't fire if a drag occurred (browser suppresses)
           e.stopPropagation();
           handleCourtPlayerTap(player.id);
         }
@@ -869,7 +1041,13 @@ function renderBench() {
       }
     });
     const stats = el('span', { cls: 'bench-stats' }, [pill, subBtn]);
-    ul.appendChild(el('li', {}, [name, stats]));
+    const li = el('li', {
+      attrs: { title: 'Drag onto a court player to sub in' },
+      on: {
+        pointerdown: e => onDragStart({ kind: 'bench', playerId: player.id }, e)
+      }
+    }, [name, stats]);
+    ul.appendChild(li);
   });
 }
 
@@ -1028,6 +1206,11 @@ function init() {
 
   // Swipe on court → change rotation (strict mode only)
   attachCourtSwipeHandlers();
+
+  // Drag & drop window-level handlers
+  window.addEventListener('pointermove', onDragMove);
+  window.addEventListener('pointerup', onDragEnd);
+  window.addEventListener('pointercancel', onDragEnd);
 
   renderRoster();
   renderWeights();
