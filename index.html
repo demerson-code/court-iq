@@ -96,8 +96,13 @@
           <div class="rot-display">
             <div class="rot-label">Rotation</div>
             <div class="rot-num"><span id="rotNum">1</span> <span class="rot-of">/ 6</span></div>
+            <div class="modified-badge" id="modifiedBadge" hidden>edited</div>
           </div>
           <button class="rot-btn" id="nextRotBtn" aria-label="Next rotation">→</button>
+        </div>
+        <div class="reset-row" id="resetRow" hidden>
+          <span class="reset-hint">Lineup manually edited</span>
+          <button class="btn btn-secondary btn-tiny" id="resetOptimalBtn">Reset to optimal</button>
         </div>
 
         <div class="court-wrapper">
@@ -136,6 +141,35 @@
       </div>
     </section>
   </main>
+
+  <!-- Swap mode banner -->
+  <div class="swap-banner" id="swapBanner" hidden>
+    <span class="swap-banner-text" id="swapBannerText">Tap a player to swap</span>
+    <button class="swap-banner-cancel" id="swapBannerCancel">Cancel</button>
+  </div>
+
+  <!-- Player breakdown popup -->
+  <div class="modal" id="breakdownModal" hidden>
+    <div class="modal-content breakdown-content">
+      <button class="breakdown-close" id="breakdownClose" aria-label="Close">×</button>
+      <div class="breakdown-header">
+        <div class="breakdown-avatar" id="breakdownAvatar"></div>
+        <div>
+          <h3 class="breakdown-name" id="breakdownName"></h3>
+          <p class="breakdown-position" id="breakdownPosition"></p>
+        </div>
+      </div>
+      <div class="breakdown-section">
+        <h4>Fit at every position</h4>
+        <p class="breakdown-hint">Higher = better fit. The current spot is highlighted.</p>
+        <div class="breakdown-bars" id="breakdownBars"></div>
+      </div>
+      <div class="breakdown-actions">
+        <button class="btn btn-secondary" id="breakdownSubOff">Sub off →</button>
+        <button class="btn btn-primary" id="breakdownSwap">Swap with…</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Toast notification -->
   <div class="toast" id="toast" hidden></div>

@@ -54,7 +54,8 @@ let S = {
   weights: { setting: 5, passing: 8, serving: 8, spiking: 6, defense: 7, attitude: 5, communication: 5 },
   mode: 'strict',
   result: null,
-  currentRotation: 0
+  currentRotation: 0,
+  swapMode: null  // null | { kind: 'court'|'bench', idx: number }
 };
 
 /* ===== Helpers ===== */
@@ -342,23 +343,240 @@ function generateLineup() {
     };
   }
 
-  const startingIds = new Set(result.starting6.map(p => p.id));
-  result.bench = available
-    .filter(p => !startingIds.has(p.id))
-    .map(p => ({ player: p, value: playerAvgValue(p), skill: playerSkillRaw(p) }))
-    .sort((a, b) => b.value - a.value);
+  // Snapshot the algorithm's pick so user can reset back to it after manual edits
+  result.algorithmStarting6 = result.starting6.slice();
+  result.benchPool = available.slice();   // all available players, used to manage swaps
+  result.modified = false;
 
+  rebuildDerivedFields(result);
+  return result;
+}
+
+/* Re-derives rotations, rotationScores, bench, and servingOrder from
+   result.starting6 + result.benchPool. Called after any manual swap. */
+function rebuildDerivedFields(result) {
   if (result.mode === 'strict') {
+    const rotations = [];
+    const rotScores = [];
+    for (let r = 0; r < 6; r++) {
+      const rot = {};
+      let total = 0;
+      for (let startPos = 1; startPos <= 6; startPos++) {
+        const player = result.starting6[startPos - 1];
+        const currentPos = ((startPos - 1 - r + 6) % 6) + 1;
+        rot[currentPos] = player;
+        total += playerScoreAtPosition(player, currentPos);
+      }
+      rotations.push(rot);
+      rotScores.push(total);
+    }
+    result.rotations = rotations;
+    result.rotationScores = rotScores;
     const order = [];
     for (let r = 0; r < 6; r++) order.push(result.rotations[r][1]);
     result.servingOrder = order;
   } else {
+    const rotation = {};
+    let total = 0;
+    for (let i = 0; i < 6; i++) {
+      rotation[i + 1] = result.starting6[i];
+      total += playerScoreAtPosition(result.starting6[i], i + 1);
+    }
+    result.rotations = [rotation];
+    result.rotationScores = [total];
     result.servingOrder = [...result.starting6].sort(
       (a, b) => (b.skills.serving || 0) - (a.skills.serving || 0)
     );
   }
 
-  return result;
+  const startingIds = new Set(result.starting6.map(p => p.id));
+  result.bench = result.benchPool
+    .filter(p => !startingIds.has(p.id))
+    .map(p => ({ player: p, value: playerAvgValue(p), skill: playerSkillRaw(p) }))
+    .sort((a, b) => b.value - a.value);
+}
+
+/* ===== Swap / Sub-In Logic ===== */
+function arraysSamePlayers(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i].id !== b[i].id) return false;
+  return true;
+}
+
+function markModifiedIfChanged() {
+  if (!S.result) return;
+  S.result.modified = !arraysSamePlayers(S.result.starting6, S.result.algorithmStarting6);
+}
+
+function swapTwoOnCourt(idxA, idxB) {
+  const r = S.result;
+  if (idxA === idxB) return;
+  const tmp = r.starting6[idxA];
+  r.starting6[idxA] = r.starting6[idxB];
+  r.starting6[idxB] = tmp;
+  rebuildDerivedFields(r);
+  markModifiedIfChanged();
+}
+
+function subInBenchPlayer(benchPlayerId, courtIdx) {
+  const r = S.result;
+  const benchPlayer = r.benchPool.find(p => p.id === benchPlayerId);
+  if (!benchPlayer) return;
+  // benchPlayer is already in benchPool; just swap references in starting6.
+  // (benchPool stays the same; rebuildDerivedFields recomputes who's bench.)
+  r.starting6[courtIdx] = benchPlayer;
+  rebuildDerivedFields(r);
+  markModifiedIfChanged();
+}
+
+function startingIdxOfPlayer(playerId) {
+  return S.result.starting6.findIndex(p => p.id === playerId);
+}
+
+function startingIdxAtPosition(pos, rotIdx) {
+  // Find which starting6 index corresponds to a player currently at `pos` in rotation `rotIdx`.
+  // Rotation cycle: a player at starting position S is at currentPos((S-1 - r + 6) % 6) + 1.
+  // So given a current position P, starting position S = ((P - 1 + r) % 6) + 1.
+  const startPos = ((pos - 1 + rotIdx) % 6) + 1;
+  return startPos - 1;
+}
+
+/* ===== Swap mode ===== */
+function enterSwapMode(kind, idx) {
+  S.swapMode = { kind, idx };
+  document.body.classList.add('swap-mode');
+  // Mark the source player on court
+  const sourcePlayer = kind === 'court'
+    ? S.result.starting6[idx]
+    : S.result.benchPool.find(p => p.id === idx);
+  $$('.player-circle').forEach(c => c.classList.remove('swap-source'));
+  if (kind === 'court' && sourcePlayer) {
+    const circle = document.querySelector(`.player-circle[data-player-id="${sourcePlayer.id}"]`);
+    if (circle) circle.classList.add('swap-source');
+  }
+  const banner = $('#swapBanner');
+  const text = $('#swapBannerText');
+  text.textContent = kind === 'court'
+    ? `Tap a different player to swap with ${sourcePlayer?.name?.split(' ')[0] || 'them'}`
+    : `Tap a court player to sub in ${sourcePlayer?.name?.split(' ')[0] || 'them'}`;
+  banner.hidden = false;
+}
+
+function exitSwapMode() {
+  S.swapMode = null;
+  document.body.classList.remove('swap-mode');
+  $$('.player-circle').forEach(c => c.classList.remove('swap-source'));
+  $('#swapBanner').hidden = true;
+}
+
+function handleCourtPlayerTap(playerId) {
+  if (!S.result) return;
+  if (S.swapMode) {
+    const courtIdx = startingIdxOfPlayer(playerId);
+    if (S.swapMode.kind === 'court') {
+      if (S.swapMode.idx === courtIdx) {
+        // Tapped the source again — cancel
+        exitSwapMode();
+        return;
+      }
+      swapTwoOnCourt(S.swapMode.idx, courtIdx);
+      exitSwapMode();
+      renderLineup();
+      toast('Swapped.');
+    } else if (S.swapMode.kind === 'bench') {
+      subInBenchPlayer(S.swapMode.idx, courtIdx);  // idx is benchPlayerId for bench mode
+      exitSwapMode();
+      renderLineup();
+      toast('Subbed in.');
+    }
+    return;
+  }
+  // No swap mode — open breakdown
+  openBreakdown(playerId);
+}
+
+/* ===== Breakdown popup ===== */
+function openBreakdown(playerId) {
+  if (!S.result) return;
+  const courtIdx = startingIdxOfPlayer(playerId);
+  if (courtIdx < 0) return;
+  const player = S.result.starting6[courtIdx];
+  const rotIdx = S.result.mode === 'strict' ? S.currentRotation : 0;
+  const currentPos = ((courtIdx - rotIdx + 6) % 6) + 1;
+
+  // Compute score at all 6 positions
+  const scores = [];
+  for (let p = 1; p <= 6; p++) {
+    scores.push({ pos: p, score: playerScoreAtPosition(player, p) });
+  }
+  const max = Math.max(...scores.map(s => s.score));
+  const bestPos = scores.find(s => s.score === max).pos;
+
+  // Avatar = first letter
+  const avatar = $('#breakdownAvatar');
+  avatar.textContent = (player.name || '?').trim().charAt(0).toUpperCase();
+  $('#breakdownName').textContent = player.name || '?';
+  $('#breakdownPosition').textContent = `Currently at ${POSITION_NAMES[currentPos]} (pos ${currentPos})`;
+
+  // Bars
+  const bars = $('#breakdownBars');
+  bars.replaceChildren();
+  for (let p = 1; p <= 6; p++) {
+    const s = scores.find(x => x.pos === p);
+    const cls = ['bd-bar-row'];
+    if (p === currentPos) cls.push('is-current');
+    if (p === bestPos) cls.push('is-best');
+    const widthPct = (s.score / max) * 100;
+    const label = el('span', { cls: 'bd-bar-label', text: `${POSITION_NAMES[p]} (${p})` });
+    const fill = el('div', { cls: 'bd-bar-fill' });
+    fill.style.width = widthPct.toFixed(1) + '%';
+    const track = el('div', { cls: 'bd-bar-track' }, [fill]);
+    const value = el('span', { cls: 'bd-bar-value', text: s.score.toFixed(0) });
+    bars.appendChild(el('div', { cls: cls.join(' ') }, [label, track, value]));
+  }
+
+  // Stash player id on the modal so action buttons know who
+  $('#breakdownModal').dataset.playerId = playerId;
+  $('#breakdownModal').hidden = false;
+}
+
+function closeBreakdown() {
+  $('#breakdownModal').hidden = true;
+}
+
+function breakdownStartSwap() {
+  const playerId = $('#breakdownModal').dataset.playerId;
+  const courtIdx = startingIdxOfPlayer(playerId);
+  if (courtIdx < 0) return;
+  closeBreakdown();
+  enterSwapMode('court', courtIdx);
+}
+
+function breakdownSubOff() {
+  // Remove this player; bring in the highest-ranked bench player.
+  const playerId = $('#breakdownModal').dataset.playerId;
+  const courtIdx = startingIdxOfPlayer(playerId);
+  if (courtIdx < 0) return;
+  if (!S.result.bench.length) {
+    toast('No bench players available.');
+    return;
+  }
+  const incoming = S.result.bench[0].player;
+  S.result.starting6[courtIdx] = incoming;
+  rebuildDerivedFields(S.result);
+  markModifiedIfChanged();
+  closeBreakdown();
+  renderLineup();
+  toast(`${incoming.name?.split(' ')[0] || 'Sub'} subbed in.`);
+}
+
+function resetToOptimal() {
+  if (!S.result) return;
+  S.result.starting6 = S.result.algorithmStarting6.slice();
+  rebuildDerivedFields(S.result);
+  S.result.modified = false;
+  renderLineup();
+  toast('Reset to optimal lineup.');
 }
 
 /* ===== Roster Render ===== */
@@ -530,6 +748,10 @@ function renderLineup() {
 
   $('.rotation-controls').style.display = r.mode === 'strict' ? 'flex' : 'none';
 
+  // Modified badge / reset row visibility
+  $('#modifiedBadge').hidden = !r.modified;
+  $('#resetRow').hidden = !r.modified;
+
   renderCourt();
   renderStrengthBars();
   renderServingOrder();
@@ -554,9 +776,18 @@ function renderCourt() {
     const cls = ['player-circle'];
     if (pos === 1) cls.push('is-server');
     if (pos === 2) cls.push('is-setter');
+    if (S.swapMode?.kind === 'court' && S.result.starting6[S.swapMode.idx]?.id === player.id) {
+      cls.push('swap-source');
+    }
     const circle = el('div', {
       cls: cls.join(' '),
-      dataset: { pos: String(pos) }
+      dataset: { pos: String(pos), playerId: player.id },
+      on: {
+        click: e => {
+          e.stopPropagation();
+          handleCourtPlayerTap(player.id);
+        }
+      }
     }, [pname, ppos]);
     layer.appendChild(circle);
   }
@@ -627,7 +858,17 @@ function renderBench() {
   r.bench.forEach(({ player, skill }) => {
     const name = el('span', { cls: 'bench-name', text: player.name || '?' });
     const pill = el('span', { cls: 'bench-stat-pill', text: skill.toFixed(1) });
-    const stats = el('span', { cls: 'bench-stats' }, [pill]);
+    const subBtn = el('button', {
+      cls: 'btn-sub-in',
+      text: 'Sub In →',
+      on: {
+        click: e => {
+          e.stopPropagation();
+          enterSwapMode('bench', player.id);
+        }
+      }
+    });
+    const stats = el('span', { cls: 'bench-stats' }, [pill, subBtn]);
     ul.appendChild(el('li', {}, [name, stats]));
   });
 }
@@ -763,9 +1004,62 @@ function init() {
     history.replaceState(null, '', '#d=' + encodeStateForUrl());
   });
 
+  // Breakdown popup
+  $('#breakdownClose').addEventListener('click', closeBreakdown);
+  $('#breakdownSwap').addEventListener('click', breakdownStartSwap);
+  $('#breakdownSubOff').addEventListener('click', breakdownSubOff);
+  $('#breakdownModal').addEventListener('click', e => {
+    if (e.target.id === 'breakdownModal') closeBreakdown();
+  });
+
+  // Swap banner cancel
+  $('#swapBannerCancel').addEventListener('click', exitSwapMode);
+
+  // Reset to optimal
+  $('#resetOptimalBtn').addEventListener('click', resetToOptimal);
+
+  // ESC cancels swap mode or popup
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (S.swapMode) exitSwapMode();
+      if (!$('#breakdownModal').hidden) closeBreakdown();
+    }
+  });
+
+  // Swipe on court → change rotation (strict mode only)
+  attachCourtSwipeHandlers();
+
   renderRoster();
   renderWeights();
   updateCounts();
+}
+
+function attachCourtSwipeHandlers() {
+  const court = $('#court');
+  if (!court) return;
+  let startX = null, startY = null, startT = 0;
+  court.addEventListener('touchstart', e => {
+    if (e.target.closest('.player-circle')) return;
+    if (S.swapMode) return;
+    if (!S.result || S.result.mode !== 'strict') return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startT = Date.now();
+  }, { passive: true });
+  court.addEventListener('touchend', e => {
+    if (startX === null) return;
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const dt = Date.now() - startT;
+    startX = null;
+    if (dt > 600) return;
+    if (Math.abs(dx) < 50) return;
+    if (Math.abs(dy) > 60) return;
+    if (dx < 0) $('#nextRotBtn').click();
+    else $('#prevRotBtn').click();
+  }, { passive: true });
 }
 
 if (document.readyState === 'loading') {
