@@ -113,6 +113,23 @@ p { margin: 0; }
   background: rgba(255,255,255,0.35);
 }
 
+/* ===== Status bar (last edited) ===== */
+.status-bar {
+  background: var(--pink-soft);
+  color: var(--pink-dark);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 16px;
+  text-align: center;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid var(--pink-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.status-icon { font-size: 11px; opacity: 0.8; }
+
 /* ===== Tabs ===== */
 .tabs {
   display: flex;
@@ -1077,6 +1094,48 @@ body.swap-mode .player-circle.swap-source {
   transition: background 0.15s;
 }
 .btn-sub-in:hover { background: var(--pink-light); color: white; background: var(--pink); }
+
+/* ===== Share modal ===== */
+.share-modal-content {
+  max-width: 460px;
+  position: relative;
+  padding: 20px 18px 16px;
+}
+.share-modal-content h3 {
+  font-size: 18px;
+  margin-bottom: 6px;
+  padding-right: 32px;
+}
+.modal-info {
+  font-size: 13px;
+  color: var(--text-mute);
+  margin-bottom: 12px;
+  background: var(--pink-soft);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--pink);
+}
+.share-url-row {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 14px;
+}
+#shareUrlInput {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text-mute);
+  background: var(--bg);
+  text-overflow: ellipsis;
+}
+#shareUrlInput:focus {
+  outline: none;
+  border-color: var(--pink);
+}
 
 /* ===== Drag & Drop ===== */
 .player-circle, .bench-list li {

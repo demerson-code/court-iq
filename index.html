@@ -20,6 +20,11 @@
     </button>
   </header>
 
+  <div class="status-bar" id="statusBar" hidden>
+    <span class="status-icon">✏️</span>
+    <span id="lastEditedText">edited just now</span>
+  </div>
+
   <nav class="tabs" role="tablist">
     <button class="tab active" data-tab="roster" role="tab">
       <span class="tab-icon">👥</span>
@@ -168,6 +173,24 @@
       <div class="breakdown-actions">
         <button class="btn btn-secondary" id="breakdownSubOff">Sub off →</button>
         <button class="btn btn-primary" id="breakdownSwap">Swap with…</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Share modal -->
+  <div class="modal" id="shareModal" hidden>
+    <div class="modal-content share-modal-content">
+      <button class="breakdown-close" id="shareModalClose" aria-label="Close">×</button>
+      <h3>Share this team</h3>
+      <p class="modal-info" id="shareModalInfo">—</p>
+      <p class="hint">Send this link to your assistant coach. When they edit and share back, open their new link to see their changes.</p>
+      <div class="share-url-row">
+        <input type="text" id="shareUrlInput" readonly aria-label="Share URL">
+        <button class="btn btn-secondary btn-tiny" id="shareCopyBtn">Copy</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="shareCloseBtn">Done</button>
+        <button class="btn btn-primary" id="shareNativeBtn" hidden>Share to apps…</button>
       </div>
     </div>
   </div>

@@ -55,7 +55,8 @@ let S = {
   mode: 'strict',
   result: null,
   currentRotation: 0,
-  swapMode: null  // null | { kind: 'court'|'bench', idx: number }
+  swapMode: null,
+  lastEdited: null   // ms timestamp; updated on every save, encoded in URL
 };
 
 /* ===== Helpers ===== */
@@ -99,31 +100,56 @@ function $(sel) { return document.querySelector(sel); }
 function $$(sel) { return Array.from(document.querySelectorAll(sel)); }
 
 /* ===== Persistence ===== */
-function save() {
+let urlUpdateTimer = null;
+let lastEditedDisplayTimer = null;
+
+function save(opts = {}) {
+  // Bump timestamp for real edits (not for hash-load mirroring)
+  if (!opts.silent) S.lastEdited = Date.now();
+
   const payload = {
     teamName: S.teamName,
     players: S.players.map(p => ({
       id: p.id, name: p.name, skills: p.skills, available: p.available
     })),
     weights: S.weights,
-    mode: S.mode
+    mode: S.mode,
+    lastEdited: S.lastEdited
   };
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
   } catch (e) { /* quota / private mode */ }
+
+  // Auto-sync the URL hash so the address bar always reflects current state.
+  // Debounced so rapid edits don't thrash history.replaceState.
+  clearTimeout(urlUpdateTimer);
+  urlUpdateTimer = setTimeout(() => {
+    if (!hasMeaningfulState()) return;
+    history.replaceState(null, '', '#d=' + encodeStateForUrl());
+    updateLastEditedDisplay();
+  }, 400);
+
+  // Update display sooner so the user sees feedback
+  updateLastEditedDisplay();
+}
+
+function hasMeaningfulState() {
+  return S.players.length > 0 || (S.teamName && S.teamName.trim().length);
 }
 
 function load() {
   const urlState = readStateFromUrl();
   if (urlState) {
     applyLoadedState(urlState);
-    save();
-    return;
+    // Mirror to localStorage but keep the loaded timestamp (don't bump it)
+    save({ silent: true });
+    return { fromUrl: true };
   }
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (raw) applyLoadedState(JSON.parse(raw));
   } catch (e) { /* ignore */ }
+  return { fromUrl: false };
 }
 
 function applyLoadedState(data) {
@@ -143,6 +169,7 @@ function applyLoadedState(data) {
   if (data.mode === 'loose' || data.mode === 'strict') {
     S.mode = data.mode;
   }
+  if (typeof data.lastEdited === 'number') S.lastEdited = data.lastEdited;
 }
 
 /* ===== URL encoding (compact base64url JSON) ===== */
@@ -155,7 +182,8 @@ function encodeStateForUrl() {
       a: p.available ? 1 : 0
     })),
     w: SKILLS.map(k => S.weights[k] | 0),
-    m: S.mode === 'loose' ? 0 : 1
+    m: S.mode === 'loose' ? 0 : 1,
+    e: S.lastEdited || undefined
   };
   return b64urlEncode(JSON.stringify(compact));
 }
@@ -182,7 +210,8 @@ function readStateFromUrl() {
         SKILLS.forEach((k, i) => w[k] = (c.w && c.w[i]) || 5);
         return w;
       })(),
-      mode: c.m === 0 ? 'loose' : 'strict'
+      mode: c.m === 0 ? 'loose' : 'strict',
+      lastEdited: typeof c.e === 'number' ? c.e : null
     };
   } catch (e) { return null; }
 }
@@ -206,6 +235,108 @@ function buildShareUrl() {
   const url = new URL(window.location.href);
   url.hash = 'd=' + encodeStateForUrl();
   return url.toString();
+}
+
+/* ===== Last-edited display ===== */
+function formatRelativeTime(ts) {
+  if (!ts) return '';
+  const sec = Math.floor((Date.now() - ts) / 1000);
+  if (sec < 0 || sec < 5) return 'just now';
+  if (sec < 60) return `${sec}s ago`;
+  if (sec < 3600) {
+    const m = Math.floor(sec / 60);
+    return `${m} min${m === 1 ? '' : 's'} ago`;
+  }
+  if (sec < 86400) {
+    const h = Math.floor(sec / 3600);
+    return `${h} hr${h === 1 ? '' : 's'} ago`;
+  }
+  const d = Math.floor(sec / 86400);
+  return `${d} day${d === 1 ? '' : 's'} ago`;
+}
+
+function updateLastEditedDisplay() {
+  const bar = document.getElementById('statusBar');
+  const text = document.getElementById('lastEditedText');
+  if (!bar || !text) return;
+  if (S.lastEdited) {
+    bar.hidden = false;
+    text.textContent = `${S.teamName ? S.teamName + ' • ' : ''}edited ${formatRelativeTime(S.lastEdited)}`;
+  } else {
+    bar.hidden = true;
+  }
+  // Re-tick every minute so the relative time stays accurate
+  clearTimeout(lastEditedDisplayTimer);
+  lastEditedDisplayTimer = setTimeout(updateLastEditedDisplay, 60_000);
+}
+
+/* ===== Share modal ===== */
+async function openShareModal() {
+  const url = buildShareUrl();
+  const teamName = S.teamName?.trim() || 'Untitled team';
+  const playerCount = S.players.filter(p => (p.name || '').trim()).length;
+  const editedTxt = S.lastEdited ? `edited ${formatRelativeTime(S.lastEdited)}` : 'never edited';
+
+  document.getElementById('shareModalInfo').textContent =
+    `${teamName} · ${playerCount} player${playerCount === 1 ? '' : 's'} · ${editedTxt}`;
+
+  const input = document.getElementById('shareUrlInput');
+  input.value = url;
+
+  const nativeBtn = document.getElementById('shareNativeBtn');
+  // Show native share if supported on this device
+  const shareData = { title: `${teamName} — Court IQ`, text: `Court IQ team: ${teamName}`, url };
+  if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
+    nativeBtn.hidden = false;
+  } else {
+    nativeBtn.hidden = true;
+  }
+
+  document.getElementById('shareModal').hidden = false;
+  // Make sure the URL hash is up to date right now (don't wait for debounce)
+  history.replaceState(null, '', '#d=' + encodeStateForUrl());
+}
+
+function closeShareModal() {
+  document.getElementById('shareModal').hidden = true;
+}
+
+async function shareNativeOrCopy() {
+  const url = buildShareUrl();
+  const teamName = S.teamName?.trim() || 'Court IQ team';
+  const shareData = {
+    title: `${teamName} — Court IQ`,
+    text: `${teamName} on Court IQ:`,
+    url
+  };
+  if (navigator.share) {
+    try {
+      await navigator.share(shareData);
+      closeShareModal();
+      return;
+    } catch (e) {
+      if (e?.name !== 'AbortError') {
+        // Fall through to clipboard
+      } else {
+        return;
+      }
+    }
+  }
+  await copyShareUrl();
+}
+
+async function copyShareUrl() {
+  const url = buildShareUrl();
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('Link copied — paste it in iMessage or email.');
+  } catch (e) {
+    // Last resort
+    const input = document.getElementById('shareUrlInput');
+    input.select();
+    document.execCommand?.('copy');
+    toast('Link copied.');
+  }
 }
 
 /* ===== Algorithm ===== */
@@ -1099,7 +1230,7 @@ async function confirmDelete(player) {
 
 /* ===== Init / wiring ===== */
 function init() {
-  load();
+  const loadResult = load();
 
   $('#teamName').value = S.teamName;
   $('#teamName').addEventListener('input', e => {
@@ -1174,16 +1305,18 @@ function init() {
     renderStrengthBars();
   });
 
-  $('#shareBtn').addEventListener('click', async () => {
-    const url = buildShareUrl();
-    try {
-      await navigator.clipboard.writeText(url);
-      toast('Share link copied to clipboard!');
-    } catch (e) {
-      window.prompt('Copy this link:', url);
-    }
-    history.replaceState(null, '', '#d=' + encodeStateForUrl());
+  $('#shareBtn').addEventListener('click', openShareModal);
+
+  // Share modal wiring
+  $('#shareModalClose').addEventListener('click', closeShareModal);
+  $('#shareCloseBtn').addEventListener('click', closeShareModal);
+  $('#shareCopyBtn').addEventListener('click', copyShareUrl);
+  $('#shareNativeBtn').addEventListener('click', shareNativeOrCopy);
+  $('#shareModal').addEventListener('click', e => {
+    if (e.target.id === 'shareModal') closeShareModal();
   });
+  // Tap-and-select the URL input contents for easy manual copy
+  $('#shareUrlInput').addEventListener('focus', e => e.target.select());
 
   // Breakdown popup
   $('#breakdownClose').addEventListener('click', closeBreakdown);
@@ -1204,6 +1337,7 @@ function init() {
     if (e.key === 'Escape') {
       if (S.swapMode) exitSwapMode();
       if (!$('#breakdownModal').hidden) closeBreakdown();
+      if (!$('#shareModal').hidden) closeShareModal();
     }
   });
 
@@ -1218,6 +1352,14 @@ function init() {
   renderRoster();
   renderWeights();
   updateCounts();
+  updateLastEditedDisplay();
+
+  // First-time welcome when opening someone else's shared link
+  if (loadResult?.fromUrl) {
+    setTimeout(() => {
+      toast('Loaded shared team. Your edits sync to the URL — tap 🔗 to share back.', 4500);
+    }, 300);
+  }
 }
 
 function attachCourtSwipeHandlers() {
