@@ -1113,17 +1113,20 @@ function init() {
 
   $('#addPlayerBtn').addEventListener('click', () => {
     const np = newPlayer('');
-    np._expanded = true;
+    // Stay collapsed — keeps the Add Player button close for rapid roster entry.
+    // User can tap the card later to expand and edit skills.
     S.players.push(np);
     save();
     renderRoster();
-    setTimeout(() => {
+    requestAnimationFrame(() => {
       const card = document.querySelector(`.player-card[data-id="${np.id}"]`);
-      if (card) {
-        const input = card.querySelector('.player-name-input');
-        if (input) input.focus();
-      }
-    }, 50);
+      if (!card) return;
+      const input = card.querySelector('.player-name-input');
+      if (input) input.focus();
+      // Scroll so the new card AND the Add Player button below it are visible
+      const btn = $('#addPlayerBtn');
+      btn?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
   });
 
   $$('input[name="mode"]').forEach(r => {

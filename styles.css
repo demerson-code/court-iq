@@ -223,6 +223,20 @@ main {
 }
 .btn-add:hover { background: var(--pink-soft); }
 
+.btn-add-player {
+  width: 100%;
+  padding: 14px;
+  font-size: 15px;
+  margin-bottom: 12px;
+  font-weight: 700;
+  border-width: 2px;
+}
+.btn-add-player:hover {
+  background: var(--pink-soft);
+  border-color: var(--pink-dark);
+  color: var(--pink-dark);
+}
+
 .btn-run {
   width: 100%;
   font-size: 18px;
