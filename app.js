@@ -19,9 +19,9 @@ const SKILL_LABELS_SHORT = {
   passing: 'Pass',
   serving: 'Serve',
   spiking: 'Spike',
-  defense: 'Def',
-  attitude: 'Att',
-  communication: 'Comm'
+  defense: 'Defense',
+  attitude: 'Attitude',
+  communication: 'Comm.'
 };
 
 // Position multipliers — how much each skill matters at each court position.
@@ -48,8 +48,10 @@ const POSITION_NAMES = {
 const SAVE_KEY = 'court_iq_v1';
 
 /* ===== State ===== */
+const TEAM_NAME = 'Panthers';   // hardcoded for this season; topbar shows the badge
+
 let S = {
-  teamName: '',
+  teamName: TEAM_NAME,
   players: [],
   weights: { setting: 5, passing: 8, serving: 8, spiking: 6, defense: 7, attitude: 5, communication: 5 },
   mode: 'strict',
@@ -160,7 +162,8 @@ function load() {
 
 function applyLoadedState(data) {
   if (!data) return;
-  S.teamName = data.teamName || '';
+  // Team name is fixed for this season — keep TEAM_NAME regardless of incoming data
+  S.teamName = TEAM_NAME;
   if (Array.isArray(data.players)) {
     S.players = data.players.map(p => ({
       id: p.id || genId(),
@@ -259,6 +262,112 @@ function buildShareUrl() {
   const url = new URL(window.location.href);
   url.hash = 'd=' + encodeStateForUrl();
   return url.toString();
+}
+
+/* ===== Help system =====
+   Help content stored as structured data. Each entry defines title +
+   an array of body items rendered as DOM (no innerHTML on dynamic
+   strings). Items: {p}=paragraph, {h}=subheading, {dl}=def list,
+   {callout}=highlighted note. */
+const HELP = {
+  'skills-key': {
+    title: 'Skills explained',
+    body: [
+      { p: 'Each player has 7 skills, rated 1–10. Use these definitions to keep ratings consistent across your roster:' },
+      { dl: [
+        ['Setting', 'Running offense as the setter — placing the second touch for a hitter.'],
+        ['Passing', 'Receiving serves and free balls accurately to the setter.'],
+        ['Serving', 'Power, accuracy, and consistency of their serve.'],
+        ['Spiking', 'Attacking strength at the net — spike technique and shot selection.'],
+        ['Defense', 'Digging hard-driven balls and reading the opponent’s attack.'],
+        ['Attitude', 'Hustle, resilience, sportsmanship, handling pressure.'],
+        ['Communication', 'Calling balls, talking on court, leading teammates.']
+      ] },
+      { callout: 'Tip: rate honestly relative to your team. A 7 means "above average for our group," not "above average in the league."' }
+    ]
+  },
+  'lineup-mode': {
+    title: 'Strict vs. Loose mode',
+    body: [
+      { h: 'Strict — Real volleyball rotation' },
+      { p: 'The same 6 players cycle through all 6 court positions over the set, in legal volleyball rotation order. The optimizer picks an arrangement that:' },
+      { dl: [
+        ['Avoids weak rotations', 'Spreads strong players across the cycle so no rotation is mostly weak players.'],
+        ['Honors position 2 setter', 'Whoever rotates into position 2 is the setter for that rotation, so setting skill is weighted there.'],
+        ['Optimizes serving order', 'The strongest server starts at position 1.']
+      ] },
+      { callout: 'Use this for actual games where rotation rules apply.' },
+      { h: 'Loose — Best player at each spot' },
+      { p: 'Each player is pinned to the position they’re best suited for, ignoring rotation. The setter stays at setter, the strongest hitter stays front-row, etc.' },
+      { callout: 'Use this for practice, scrimmage, or to see where each player’s strengths lie when freed from rotation rules.' }
+    ]
+  },
+  'rotation-strength': {
+    title: 'Rotation strength bars',
+    body: [
+      { p: 'Each bar represents one of the 6 rotations during the set. The height is the total skill on the court for that rotation — taller bars are stronger rotations.' },
+      { dl: [
+        ['Pink bars', 'Strong rotations.'],
+        ['Yellow bars', 'Weakest rotations — your team is most vulnerable here. Keep an eye on these in the game.'],
+        ['Active bar', 'The rotation currently shown on the court (filled darker).']
+      ] },
+      { callout: 'Tap any bar to jump to that rotation on the court.' }
+    ]
+  },
+  'court-legend': {
+    title: 'Court legend',
+    body: [
+      { p: 'A few visual cues on the court diagram:' },
+      { dl: [
+        ['Yellow ring', 'The server for this rotation (position 1).'],
+        ['Pink-tint background', 'The setter for this rotation (position 2). Whoever rotates here sets.'],
+        ['Position numbers', '4-3-2 is the front row (left to right). 5-6-1 is the back row.']
+      ] },
+      { p: 'Tap any player to see their fit at every position. Drag a player onto another to swap them. Drag onto the bench drop zone to sub them off.' }
+    ]
+  }
+};
+
+function openHelp(key) {
+  const entry = HELP[key];
+  if (!entry) return;
+  $('#helpTitle').textContent = entry.title;
+  const bodyEl = $('#helpBody');
+  bodyEl.replaceChildren();
+  for (const item of entry.body) {
+    if (item.p) bodyEl.appendChild(el('p', { text: item.p }));
+    else if (item.h) bodyEl.appendChild(el('h4', { text: item.h, attrs: { style: 'font-size:14px;margin:14px 0 6px;color:var(--pink-dark);' } }));
+    else if (item.dl) {
+      const dl = document.createElement('dl');
+      for (const [t, d] of item.dl) {
+        dl.appendChild(el('dt', { text: t }));
+        dl.appendChild(el('dd', { text: d }));
+      }
+      bodyEl.appendChild(dl);
+    } else if (item.callout) {
+      bodyEl.appendChild(el('div', { cls: 'help-callout', text: item.callout }));
+    }
+  }
+  $('#helpModal').hidden = false;
+}
+
+function closeHelp() {
+  $('#helpModal').hidden = true;
+}
+
+function makeHelpButton(key, label = 'What is this?') {
+  return el('button', {
+    cls: 'help-btn',
+    text: '?',
+    attrs: { 'aria-label': label, type: 'button' },
+    on: {
+      click: e => {
+        e.preventDefault();
+        e.stopPropagation();
+        openHelp(key);
+      }
+    }
+  });
 }
 
 /* ===== Last-edited display ===== */
@@ -1268,11 +1377,7 @@ async function confirmDelete(player) {
 function init() {
   const loadResult = load();
 
-  $('#teamName').value = S.teamName;
-  $('#teamName').addEventListener('input', e => {
-    S.teamName = e.target.value;
-    save();
-  });
+  // Team name is fixed (Panthers); no input wiring needed
 
   $$('.tab').forEach(tab => {
     tab.addEventListener('click', () => setTab(tab.dataset.tab));
@@ -1343,6 +1448,21 @@ function init() {
 
   $('#shareBtn').addEventListener('click', openShareModal);
 
+  // Help button delegation: any element with [data-help="key"] opens that help entry
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-help]');
+    if (btn && document.body.contains(btn)) {
+      e.preventDefault();
+      e.stopPropagation();
+      openHelp(btn.getAttribute('data-help'));
+    }
+  });
+  $('#helpClose').addEventListener('click', closeHelp);
+  $('#helpDoneBtn').addEventListener('click', closeHelp);
+  $('#helpModal').addEventListener('click', e => {
+    if (e.target.id === 'helpModal') closeHelp();
+  });
+
   // Share modal wiring
   $('#shareModalClose').addEventListener('click', closeShareModal);
   $('#shareCloseBtn').addEventListener('click', closeShareModal);
@@ -1374,6 +1494,7 @@ function init() {
       if (S.swapMode) exitSwapMode();
       if (!$('#breakdownModal').hidden) closeBreakdown();
       if (!$('#shareModal').hidden) closeShareModal();
+      if (!$('#helpModal').hidden) closeHelp();
     }
   });
 

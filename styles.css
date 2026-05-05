@@ -77,22 +77,53 @@ p { margin: 0; }
   letter-spacing: -0.3px;
   white-space: nowrap;
 }
-.team-name {
+.team-badge {
   flex: 1;
   min-width: 0;
-  background: rgba(255,255,255,0.2);
-  border: 1px solid rgba(255,255,255,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.25), rgba(255,255,255,0.08));
+  border: 1.5px solid rgba(255,255,255,0.45);
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
+  padding: 7px 14px;
   color: white;
-  font-size: 15px;
-  font-weight: 600;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 2px;
+  font-size: 16px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.18), 0 0 8px rgba(255,255,255,0.18);
+  font-family: "Trebuchet MS", "Helvetica Neue", Arial, sans-serif;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
 }
-.team-name::placeholder { color: rgba(255,255,255,0.7); }
-.team-name:focus {
-  outline: none;
-  background: rgba(255,255,255,0.3);
-  border-color: rgba(255,255,255,0.6);
+.team-badge::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 30%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%);
+  transform: skewX(-20deg);
+  animation: badgeShine 6s ease-in-out infinite;
+}
+@keyframes badgeShine {
+  0%, 70% { transform: translateX(0) skewX(-20deg); opacity: 0; }
+  80% { opacity: 1; }
+  100% { transform: translateX(420%) skewX(-20deg); opacity: 0; }
+}
+.team-badge-icon {
+  font-size: 18px;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+  font-style: normal;
+  flex-shrink: 0;
+}
+.team-badge-name {
+  display: inline-block;
+  transform: skewX(-4deg);
 }
 .icon-btn {
   background: rgba(255,255,255,0.2);
@@ -1135,6 +1166,115 @@ body.swap-mode .player-circle.swap-source {
   transition: background 0.15s;
 }
 .btn-sub-in:hover { background: var(--pink-light); color: white; background: var(--pink); }
+
+/* ===== Help button + modal ===== */
+.help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--pink);
+  background: var(--card);
+  color: var(--pink);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+  transition: background 0.15s, transform 0.1s;
+  vertical-align: middle;
+}
+.help-btn:hover {
+  background: var(--pink);
+  color: white;
+}
+.help-btn:active { transform: scale(0.92); }
+
+.help-modal-content {
+  max-width: 480px;
+  position: relative;
+  padding: 28px 22px 18px;
+  text-align: left;
+}
+.help-icon-wrap {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--pink), var(--pink-dark));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(255,77,139,0.4);
+}
+.help-icon-large {
+  color: white;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+}
+.help-title {
+  text-align: center;
+  font-size: 18px;
+  margin-bottom: 12px;
+  margin-top: 6px;
+}
+.help-body {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  margin-bottom: 16px;
+}
+.help-body p {
+  margin: 0 0 10px;
+}
+.help-body p:last-child { margin-bottom: 0; }
+.help-body strong {
+  color: var(--pink-dark);
+  font-weight: 800;
+}
+.help-body dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.help-body dt {
+  font-weight: 800;
+  color: var(--pink-dark);
+  font-size: 13px;
+  margin-top: 4px;
+}
+.help-body dt:first-child { margin-top: 0; }
+.help-body dd {
+  margin: 0 0 4px 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.help-body .help-callout {
+  background: var(--pink-soft);
+  border-left: 3px solid var(--pink);
+  padding: 10px 12px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 13px;
+  color: var(--pink-dark);
+  margin: 10px 0;
+}
+.help-body .help-callout strong { color: var(--pink-dark); }
+
+.label-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
 /* ===== Share modal ===== */
 .share-modal-content {

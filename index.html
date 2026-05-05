@@ -14,7 +14,10 @@
       <span class="ball">🏐</span>
       <h1 class="brand">Court IQ</h1>
     </div>
-    <input class="team-name" id="teamName" placeholder="Team Name" maxlength="30" autocomplete="off">
+    <div class="team-badge" aria-label="Team: Panthers">
+      <span class="team-badge-icon" aria-hidden="true">🐾</span>
+      <span class="team-badge-name">PANTHERS</span>
+    </div>
     <button class="icon-btn" id="shareBtn" title="Copy share link" aria-label="Share">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
     </button>
@@ -66,26 +69,26 @@
     <section class="tab-panel" id="weightsTab" role="tabpanel">
       <div class="section-header">
         <div>
-          <h2>Skill Weights</h2>
+          <h2 class="label-with-help">Skill Weights <button class="help-btn" data-help="skills-key" aria-label="What do these skills mean?" type="button">?</button></h2>
           <p class="hint">How important is each skill? (1 = not much, 10 = critical)</p>
         </div>
         <button class="btn btn-secondary" id="resetWeightsBtn">Reset</button>
       </div>
       <div class="weight-list" id="weightList"></div>
       <div class="mode-card">
-        <h3>Lineup Mode</h3>
+        <h3 class="label-with-help">Lineup Mode <button class="help-btn" data-help="lineup-mode" aria-label="When should I pick which?" type="button">?</button></h3>
         <label class="radio-row">
           <input type="radio" name="mode" value="strict" checked>
           <div>
-            <strong>Strict</strong>
-            <span class="radio-hint">Full 6-rotation order using real volleyball rules</span>
+            <strong>Strict — Real rotation</strong>
+            <span class="radio-hint">Players cycle through all 6 positions in legal volleyball order. Use for actual games where rotation rules apply.</span>
           </div>
         </label>
         <label class="radio-row">
           <input type="radio" name="mode" value="loose">
           <div>
-            <strong>Loose</strong>
-            <span class="radio-hint">Best player in each spot, no rotation cycle</span>
+            <strong>Loose — Best per spot</strong>
+            <span class="radio-hint">Each player pinned to their best-fit position. No rotation cycle. Use for practice, scrimmage, or to see where players shine.</span>
           </div>
         </label>
       </div>
@@ -105,7 +108,10 @@
         <div class="rotation-controls">
           <button class="rot-btn" id="prevRotBtn" aria-label="Previous rotation">←</button>
           <div class="rot-display">
-            <div class="rot-label">Rotation</div>
+            <div class="rot-label label-with-help">
+              Rotation
+              <button class="help-btn" data-help="court-legend" aria-label="What do the colors mean?" type="button">?</button>
+            </div>
             <div class="rot-num"><span id="rotNum">1</span> <span class="rot-of">/ 6</span></div>
             <div class="modified-badge" id="modifiedBadge" hidden>edited</div>
           </div>
@@ -135,7 +141,7 @@
         </div>
 
         <div class="rotation-strength">
-          <h3>Rotation Strength</h3>
+          <h3 class="label-with-help">Rotation Strength <button class="help-btn" data-help="rotation-strength" aria-label="What do these bars mean?" type="button">?</button></h3>
           <div class="strength-bars" id="strengthBars"></div>
         </div>
 
@@ -188,6 +194,21 @@
       <div class="breakdown-actions">
         <button class="btn btn-secondary" id="breakdownSubOff">Sub off →</button>
         <button class="btn btn-primary" id="breakdownSwap">Swap with…</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help / Info modal -->
+  <div class="modal" id="helpModal" hidden>
+    <div class="modal-content help-modal-content">
+      <button class="breakdown-close" id="helpClose" aria-label="Close">×</button>
+      <div class="help-icon-wrap" aria-hidden="true">
+        <span class="help-icon-large" id="helpIconLarge">?</span>
+      </div>
+      <h3 class="help-title" id="helpTitle">Help</h3>
+      <div class="help-body" id="helpBody"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="helpDoneBtn">Got it</button>
       </div>
     </div>
   </div>
