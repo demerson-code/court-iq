@@ -48,6 +48,12 @@
           <h2>Players</h2>
           <p class="hint"><span id="availCount">0</span> available · <span id="totalCount">0</span> total</p>
         </div>
+        <select class="sort-select" id="rosterSort" aria-label="Sort players">
+          <option value="avg-desc">AVG: high → low</option>
+          <option value="avg-asc">AVG: low → high</option>
+          <option value="name-asc">Name: A → Z</option>
+          <option value="name-desc">Name: Z → A</option>
+        </select>
       </div>
       <div class="player-list" id="playerList"></div>
       <button class="btn btn-add btn-add-player" id="addPlayerBtn">+ Add Player</button>
@@ -140,7 +146,16 @@
         </div>
 
         <div class="bench-card" id="benchCard">
-          <h3>Bench <span class="bench-hint">(available, ranked strongest → weakest)</span></h3>
+          <div class="bench-card-head">
+            <h3>Bench</h3>
+            <select class="sort-select" id="benchSort" aria-label="Sort bench">
+              <option value="avg-desc">AVG: high → low</option>
+              <option value="avg-asc">AVG: low → high</option>
+              <option value="name-asc">Name: A → Z</option>
+              <option value="name-desc">Name: Z → A</option>
+            </select>
+          </div>
+          <p class="bench-hint">Drag onto a court player to sub them in.</p>
           <ul class="bench-list" id="benchList"></ul>
           <div class="bench-drop-zone" id="benchDropZone">Drop here to send to bench</div>
         </div>

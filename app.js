@@ -56,8 +56,12 @@ let S = {
   result: null,
   currentRotation: 0,
   swapMode: null,
-  lastEdited: null   // ms timestamp; updated on every save, encoded in URL
+  lastEdited: null,
+  rosterSort: 'avg-desc',   // 'avg-desc' | 'avg-asc' | 'name-asc' | 'name-desc'
+  benchSort: 'avg-desc'
 };
+
+const SORT_MODES = new Set(['avg-desc', 'avg-asc', 'name-asc', 'name-desc']);
 
 /* ===== Helpers ===== */
 function genId() {
@@ -114,7 +118,9 @@ function save(opts = {}) {
     })),
     weights: S.weights,
     mode: S.mode,
-    lastEdited: S.lastEdited
+    lastEdited: S.lastEdited,
+    rosterSort: S.rosterSort,
+    benchSort: S.benchSort
   };
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
@@ -170,6 +176,24 @@ function applyLoadedState(data) {
     S.mode = data.mode;
   }
   if (typeof data.lastEdited === 'number') S.lastEdited = data.lastEdited;
+  if (SORT_MODES.has(data.rosterSort)) S.rosterSort = data.rosterSort;
+  if (SORT_MODES.has(data.benchSort)) S.benchSort = data.benchSort;
+}
+
+/* ===== Sorting ===== */
+function sortByMode(items, mode, getName, getAvg) {
+  const arr = items.slice();
+  switch (mode) {
+    case 'avg-asc':
+      return arr.sort((a, b) => getAvg(a) - getAvg(b));
+    case 'name-asc':
+      return arr.sort((a, b) => (getName(a) || '').toLocaleLowerCase().localeCompare((getName(b) || '').toLocaleLowerCase()));
+    case 'name-desc':
+      return arr.sort((a, b) => (getName(b) || '').toLocaleLowerCase().localeCompare((getName(a) || '').toLocaleLowerCase()));
+    case 'avg-desc':
+    default:
+      return arr.sort((a, b) => getAvg(b) - getAvg(a));
+  }
 }
 
 /* ===== URL encoding (compact base64url JSON) ===== */
@@ -881,7 +905,13 @@ function performDrop(source, target) {
 function renderRoster() {
   const list = $('#playerList');
   list.replaceChildren();
-  S.players.forEach(p => list.appendChild(buildPlayerCard(p)));
+  const sorted = sortByMode(
+    S.players,
+    S.rosterSort,
+    p => p.name,
+    p => playerSkillRaw(p)
+  );
+  sorted.forEach(p => list.appendChild(buildPlayerCard(p)));
   $('#rosterEmpty').hidden = S.players.length > 0;
   updateCounts();
 }
@@ -1158,7 +1188,13 @@ function renderBench() {
     ul.appendChild(el('li', { cls: 'bench-empty', text: 'No bench — all available players are starting.' }));
     return;
   }
-  r.bench.forEach(({ player, skill }) => {
+  const sorted = sortByMode(
+    r.bench,
+    S.benchSort,
+    item => item.player.name,
+    item => item.skill
+  );
+  sorted.forEach(({ player, skill }) => {
     const name = el('span', { cls: 'bench-name', text: player.name || '?' });
     const pill = el('span', { cls: 'bench-stat-pill', text: skill.toFixed(1) });
     const subBtn = el('button', {
@@ -1348,6 +1384,26 @@ function init() {
   window.addEventListener('pointermove', onDragMove);
   window.addEventListener('pointerup', onDragEnd);
   window.addEventListener('pointercancel', onDragEnd);
+
+  // Sort dropdowns
+  const rosterSortEl = $('#rosterSort');
+  rosterSortEl.value = S.rosterSort;
+  rosterSortEl.addEventListener('change', e => {
+    if (SORT_MODES.has(e.target.value)) {
+      S.rosterSort = e.target.value;
+      save();
+      renderRoster();
+    }
+  });
+  const benchSortEl = $('#benchSort');
+  benchSortEl.value = S.benchSort;
+  benchSortEl.addEventListener('change', e => {
+    if (SORT_MODES.has(e.target.value)) {
+      S.benchSort = e.target.value;
+      save();
+      if (S.result) renderBench();
+    }
+  });
 
   renderRoster();
   renderWeights();
